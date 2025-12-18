@@ -5,7 +5,7 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/zserge/fenster"
+	"github.com/jonasgeiler/fenster"
 )
 
 func main() {

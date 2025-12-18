@@ -1,3 +1,3 @@
-module github.com/zserge/fenster
+module github.com/jonasgeiler/fenster
 
 go 1.19

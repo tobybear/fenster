@@ -8,7 +8,7 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/zserge/fenster"
+	"github.com/jonasgeiler/fenster"
 )
 
 type Fire struct {
