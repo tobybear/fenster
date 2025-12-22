@@ -3,6 +3,7 @@
 
 /*
 todos:
+- dirty flag for buffer
 
 MacOS/Linux:
 - stretch window blit on resize
