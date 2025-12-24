@@ -123,6 +123,7 @@ static void fenster_window_resize(id v, SEL s, id note) {
 	(void)s;
 	struct fenster* f = (struct fenster *)objc_getAssociatedObject(v, "fenster");
 	CGRect frame = msg(CGRect, msg(id, note, "object"), "frame");
+//printf("%dx%d -> %dx%d\n", f->win_width, f->win_height, (int)frame.size.width, (int)frame.size.height);
 	f->win_width = frame.size.width;
 	f->win_height = frame.size.height;
 	f->scale_x = (float)f->width / (float)f->win_width;
@@ -137,7 +138,7 @@ static void fenster_draw_rect(id v, SEL s, CGRect r) {
 	struct fenster* f = (struct fenster *)objc_getAssociatedObject(v, "fenster");
 	CGContextRef context = msg(CGContextRef, msg(id, cls("NSGraphicsContext"), "currentContext"), "graphicsPort");
 	CGColorSpaceRef space = CGColorSpaceCreateDeviceRGB();
-#ifdef FENSTER_STRETCH
+#ifdef FENSTER_STRETCHa
 	if (f->width == f->win_width && f->height == f->win_height) {
 		memcpy(f->win_buf, f->buf, f->width * f->height * sizeof(uint32_t));
 	} else {
@@ -156,6 +157,7 @@ static void fenster_draw_rect(id v, SEL s, CGRect r) {
 	CGColorSpaceRelease(space);
 	CGDataProviderRelease(provider);
 	CGContextDrawImage(context, CGRectMake(0, 0, f->win_width, f->win_height), img);
+//	CGContextDrawImage(context, CGRectMake(0, 0, f->width, f->height), img);
 	CGImageRelease(img);
 }
 
@@ -178,9 +180,10 @@ FENSTER_API int fenster_open(struct fenster* f) {
 
 	msg(id, cls("NSApplication"), "sharedApplication");
 	msg1(void, NSApp, "setActivationPolicy:", NSInteger, 0);
+//	int style_mask = 0x800f;//f->allow_resize ? 15 : 7; // 3
 	int style_mask = f->allow_resize ? 15 : 7; // 3
 	f->wnd = msg4(id, msg(id, cls("NSWindow"), "alloc"), "initWithContentRect:styleMask:backing:defer:",
-		CGRect, CGRectMake(0, 0, f->width, f->height), NSUInteger, style_mask, NSUInteger, 2, BOOL, NO);
+		CGRect, CGRectMake(0, 0, f->win_width, f->win_height), NSUInteger, style_mask, NSUInteger, 2, BOOL, NO);
 	Class windelegate = objc_allocateClassPair((Class)cls("NSObject"), "FensterDelegate", 0);
 	class_addMethod(windelegate, sel_getUid("windowShouldClose:"), (IMP)fenster_should_close, "c@:@");
 	objc_registerClassPair(windelegate);
@@ -278,7 +281,7 @@ FENSTER_API int fenster_loop(struct fenster* f) {
 		{ /* NSEventTypeMouseMoved */
 			CGPoint xy = msg(CGPoint, ev, "locationInWindow");
 			f->inp.mouse_pos[0] = (uint32_t)((float)xy.x * f->scale_x);
-			f->inp.mouse_pos[1] = (uint32_t)((float)(f->height - xy.y) * f->scale_y);
+			f->inp.mouse_pos[1] = (uint32_t)((float)(f->win_height - xy.y) * f->scale_y);
 			return 0;
 		}
 	case 10: /*NSEventTypeKeyDown*/

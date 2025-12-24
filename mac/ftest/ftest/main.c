@@ -1,8 +1,8 @@
 #define FENSTER_IMPLEMENTATION
 #include "../fenster.h"
 
-#define W 1024
-#define H 768
+#define W 500
+#define H 500
 
 static void fenster_rect(struct fenster *f, int x, int y, int w, int h, uint32_t c) {
 	for (int row = 0; row < h; row++) {
@@ -41,7 +41,7 @@ static void fenster_text(struct fenster *f, int x, int y, char *s, int scale, ui
 *
 * This demo prints currently pressed keys with modifiers.
 * ============================================================ */
-static int run() {
+int main(void) {
 	uint32_t buf[W * H];
 	struct fenster f = { 0 };
 	f.title = "Press any key...";
@@ -51,7 +51,8 @@ static int run() {
 	f.allow_resize = 1;
 	int fs = 0;
 	fenster_open(&f);
-	int64_t now = fenster_time();
+fenster_resize(&f, W, H);
+
 	while (fenster_loop(&f) == 0) {
 		int has_keys = 0;
 		char s[32];
@@ -65,24 +66,28 @@ static int run() {
 		*p = '\0';
 		fenster_rect(&f, 0, 0, W, H, 0);
 		int sc = 4;
+		fenster_rect(&f, 0, 0, f.width - 1, 20, 0xff0000ff);
+		fenster_rect(&f, 0, f.height - 20, f.width - 1, 20, 0xff0000ff);
+		fenster_rect(&f, 0, 0, 20, f.height - 1, 0xff0000ff);
+		fenster_rect(&f, f.width - 20, 0, 20, f.height - 1, 0xff0000ff);
+
 		/* draw mouse "pointer" */
 		if (f.inp.mouse_pos[0] > 5 && f.inp.mouse_pos[1] > 5 && f.inp.mouse_pos[0] < (uint32_t)f.width - 5 && f.inp.mouse_pos[1] < (uint32_t)f.height - 5) {
 			fenster_rect(&f, f.inp.mouse_pos[0] - 3, f.inp.mouse_pos[1] - 3, 6, 6, f.inp.mouse_button_down[0] ? 0xffffff : 0xff0000);
 		}
+
 		fenster_text(&f, 8, 8, s, sc, 0xffffff);
-		if (has_keys) {
-			if (f.inp.key_mod[0]) {
-				fenster_text(&f, 8, 40, "Ctrl", sc, 0xffffff);
-			}
-			if (f.inp.key_mod[1]) {
-				fenster_text(&f, 8, 80, "Shift", sc, 0xffffff);
-			}
-			if (f.inp.key_mod[2]) {
-				fenster_text(&f, 8, 120, "Alt", sc, 0xffffff);
-			}
-			if (f.inp.key_mod[3]) {
-				fenster_text(&f, 8, 160, "OS", sc, 0xffffff);
-			}
+		if (f.inp.key_mod[0]) {
+			fenster_text(&f, 8, 40, "Ctrl", sc, 0xffffff);
+		}
+		if (f.inp.key_mod[1]) {
+			fenster_text(&f, 8, 80, "Shift", sc, 0xffffff);
+		}
+		if (f.inp.key_mod[2]) {
+			fenster_text(&f, 8, 120, "Alt", sc, 0xffffff);
+		}
+		if (f.inp.key_mod[3]) {
+			fenster_text(&f, 8, 160, "OS", sc, 0xffffff);
 		}
 		if (f.inp.key[9]) { fs = 1 - fs; fenster_fullscreen(&f, fs); }
 		if (f.inp.key[27]) {
@@ -94,6 +99,3 @@ static int run() {
 	return 0;
 }
 
-int main() { 
-	return run(); 
-}
