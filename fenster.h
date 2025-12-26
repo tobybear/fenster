@@ -13,6 +13,15 @@
 #define FENSTER_WIN
 #include <windows.h>
 #define WS_NORESIZE (WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU)
+static void usleep(__int64 usec) {
+	HANDLE timer;
+	LARGE_INTEGER period;
+	period.QuadPart = -(10 * usec);
+	timer = CreateWaitableTimer(NULL, TRUE, NULL);
+	SetWaitableTimer(timer, &period, 0, NULL, NULL, 0);
+	WaitForSingleObject(timer, INFINITE);
+	CloseHandle(timer);
+}
 #else
 #define FENSTER_LINUX
 #define _DEFAULT_SOURCE 1
@@ -29,6 +38,7 @@
 
 #include <stdint.h>
 #include <stdlib.h>
+#include <stdint.h>
 
 struct fenster_input_data {
 	uint8_t key_down[256];          // keys are mostly ASCII, but arrows are 17..20 (persisent until release)
@@ -88,12 +98,13 @@ FENSTER_API void fenster_cursor(struct fenster* f, const int type);
 #ifdef FENSTER_STRETCH
 static void fenster_stretch(struct fenster* f) {
 	float yc = 0.f;
+	int y, x;
 	memset(f->win_buf, 0xff, f->win_width * f->win_height * sizeof(uint32_t));
-	for (int y = 0; y < f->win_height; y++) {
+	for (y = 0; y < f->win_height; y++) {
 		uint32_t* p_src = &f->buf[(int)yc * f->width];
 		uint32_t* p_dst = &f->win_buf[y * f->win_width];
 		float xc = 0.f;
-		for (int x = 0; x < f->win_width; x++) {
+		for (x = 0; x < f->win_width; x++) {
 			*p_dst++ = *(p_src + (int)xc);
 			xc += f->scale_x;
 		}
@@ -396,13 +407,14 @@ typedef struct BINFO {
 
 static LRESULT CALLBACK fenster_wndproc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 	struct fenster* f = (struct fenster *)GetWindowLongPtr(hwnd, GWLP_USERDATA);
+	int new_width, new_height, key;
 	switch (msg) {
 	case WM_SIZE:
 		{
 			RECT rect;
 			GetClientRect(hwnd, &rect);
-			int new_width = rect.right - rect.left;
-			int new_height = rect.bottom - rect.top;
+			new_width = rect.right - rect.left;
+			new_height = rect.bottom - rect.top;
 			if (new_width != f->win_width || new_height != f->win_height) {
 				f->win_width = new_width;
 				f->win_height = new_height;
@@ -496,7 +508,7 @@ static LRESULT CALLBACK fenster_wndproc(HWND hwnd, UINT msg, WPARAM wParam, LPAR
 			f->inp.key_mod[1] = (GetKeyState(VK_SHIFT) & 0x8000) ? 1 : 0;
 			f->inp.key_mod[2] = (GetKeyState(VK_MENU) & 0x8000) ? 1 : 0;
 			f->inp.key_mod[3] = ((GetKeyState(VK_LWIN) | GetKeyState(VK_RWIN)) & 0x8000) ? 1 : 0;
-			int key = FENSTER_KEYCODES[HIWORD(lParam) & 0x1ff];
+			key = FENSTER_KEYCODES[HIWORD(lParam) & 0x1ff];
 			f->inp.key[key] = 1;
 			f->inp.key_down[key] = 1;
 			break;
@@ -507,7 +519,7 @@ static LRESULT CALLBACK fenster_wndproc(HWND hwnd, UINT msg, WPARAM wParam, LPAR
 			f->inp.key_mod[1] = (GetKeyState(VK_SHIFT) & 0x8000) ? 1 : 0;
 			f->inp.key_mod[2] = (GetKeyState(VK_MENU) & 0x8000) ? 1 : 0;
 			f->inp.key_mod[3] = ((GetKeyState(VK_LWIN) | GetKeyState(VK_RWIN)) & 0x8000) ? 1 : 0;
-			int key = FENSTER_KEYCODES[HIWORD(lParam) & 0x1ff];
+			key = FENSTER_KEYCODES[HIWORD(lParam) & 0x1ff];
 			f->inp.key_down[key] = 0;
 			break;
 		}
@@ -523,6 +535,18 @@ static LRESULT CALLBACK fenster_wndproc(HWND hwnd, UINT msg, WPARAM wParam, LPAR
 }
 
 FENSTER_API int fenster_open(struct fenster* f) {
+	int win_style, adjusted_width, adjusted_height;
+	size_t title_len = strlen(f->title);
+	RECT desiredRect = {0, 0, f->width, f->height};
+	wchar_t* title_w;
+
+	HINSTANCE hInstance = GetModuleHandle(NULL);
+	WNDCLASSEX wc = {0};
+	wc.cbSize = sizeof(WNDCLASSEX);
+	wc.style = CS_VREDRAW | CS_HREDRAW;
+	wc.lpfnWndProc = fenster_wndproc;
+	wc.hInstance = hInstance;
+	title_w = (wchar_t*)malloc(title_len * 2 + 1);
 	f->win_width = f->width;
 	f->win_height = f->height;
 #ifdef FENSTER_STRETCH
@@ -532,26 +556,16 @@ FENSTER_API int fenster_open(struct fenster* f) {
 	f->scale_x = 1.f;
 	f->scale_y = 1.f;
 
-	HINSTANCE hInstance = GetModuleHandle(NULL);
-	WNDCLASSEX wc = {0};
-	wc.cbSize = sizeof(WNDCLASSEX);
-	wc.style = CS_VREDRAW | CS_HREDRAW;
-	wc.lpfnWndProc = fenster_wndproc;
-	wc.hInstance = hInstance;
-
-	size_t l = strlen(f->title);
-	wchar_t* title = new wchar_t[l * 2 + 1];
-	mbstowcs_s(&l, title, l * 2, f->title, l);
-	wc.lpszClassName = (LPCWSTR)title;
+	mbstowcs_s(&title_len, title_w, title_len * 2, f->title, title_len);
+	wc.lpszClassName = (LPCWSTR)title_w;
 	RegisterClassEx(&wc);
-	RECT desiredRect = {0, 0, f->width, f->height};
-	int win_style = f->allow_resize ? WS_OVERLAPPEDWINDOW : WS_NORESIZE;
+	win_style = f->allow_resize ? WS_OVERLAPPEDWINDOW : WS_NORESIZE;
 	AdjustWindowRectEx(&desiredRect, win_style, FALSE, WS_EX_CLIENTEDGE);
-	int adjustedWidth = desiredRect.right - desiredRect.left;
-	int adjustedHeight = desiredRect.bottom - desiredRect.top;
-	f->hwnd = CreateWindowEx(0, title, title, win_style, CW_USEDEFAULT, CW_USEDEFAULT,
-		adjustedWidth, adjustedHeight, NULL, NULL, hInstance, NULL);
-	delete[] title;
+	adjusted_width = desiredRect.right - desiredRect.left;
+	adjusted_height = desiredRect.bottom - desiredRect.top;
+	f->hwnd = CreateWindowEx(0, title_w, title_w, win_style, CW_USEDEFAULT, CW_USEDEFAULT,
+		adjusted_width, adjusted_height, NULL, NULL, hInstance, NULL);
+	//x free(title_w);
 	if (f->hwnd == NULL) return -1;
 	SetWindowLongPtr(f->hwnd, GWLP_USERDATA, (LONG_PTR)f);
 	ShowWindow(f->hwnd, SW_NORMAL);
@@ -572,9 +586,9 @@ FENSTER_API void fenster_close(struct fenster* f) {
 }
 
 FENSTER_API int fenster_loop(struct fenster* f) {
+	MSG msg;
 	memset(f->inp.mouse_button, 0, sizeof(f->inp.mouse_button));
 	memset(f->inp.key, 0, sizeof(f->inp.key));
-	MSG msg;
 	while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {
 		if (msg.message == WM_QUIT) return -1;
 		TranslateMessage(&msg);
@@ -585,7 +599,8 @@ FENSTER_API int fenster_loop(struct fenster* f) {
 }
 
 FENSTER_API void fenster_sleep(const int64_t ms) { 
-	Sleep((DWORD)ms); 
+	// Sleep((DWORD)ms); 
+	usleep(ms * 1000);
 }
 
 FENSTER_API int64_t fenster_time() {
@@ -597,19 +612,17 @@ FENSTER_API int64_t fenster_time() {
 
 FENSTER_API void fenster_fullscreen(struct fenster* f, const int enabled) {
 	DWORD dwStyle = GetWindowLong(f->hwnd, GWL_STYLE);
+	MONITORINFO mi = { 
+		sizeof(MONITORINFO),           // cbSize
+		{0, 0, 0, 0},                 // rcMonitor
+		{0, 0, 0, 0},                 // rcWork
+		MONITORINFOF_PRIMARY          // dwFlags
+	};
 	int ws = f->allow_resize ? WS_OVERLAPPEDWINDOW : WS_NORESIZE;
 
 	if (enabled) {
 		GetWindowPlacement(f->hwnd, &g_wpPrev);
 		SetWindowLong(f->hwnd, GWL_STYLE, dwStyle & ~ws);
-
-		MONITORINFO mi = { 
-			sizeof(MONITORINFO),           // cbSize
-			{0, 0, 0, 0},                 // rcMonitor
-			{0, 0, 0, 0},                 // rcWork
-			MONITORINFOF_PRIMARY          // dwFlags
-		};
-
 		GetMonitorInfo(MonitorFromWindow(f->hwnd, MONITOR_DEFAULTTOPRIMARY), &mi);
 
 		SetWindowPos(f->hwnd, HWND_TOP,
@@ -628,6 +641,9 @@ FENSTER_API void fenster_fullscreen(struct fenster* f, const int enabled) {
 
 #ifdef FENSTER_CURSOR
 FENSTER_API void fenster_cursor(struct fenster* f, const int type) {
+	int t = type;
+	WNDCLASSEXA wc;
+
 	if (type == current_cursor_type) return;
 	// Initialize cursors on first use
 	if (!cursors_initialized) {
@@ -640,7 +656,6 @@ FENSTER_API void fenster_cursor(struct fenster* f, const int type) {
 		cursors_initialized = 1;
 	}
 
-	int t = type;
 	if (type < 0 || type > 5) {
 		t = 1;  // Default to normal cursor if invalid type
 	}
@@ -656,7 +671,6 @@ FENSTER_API void fenster_cursor(struct fenster* f, const int type) {
 		SetCursor(cursors[t]);
 
 		// Also set the class cursor so it persists
-		WNDCLASSEXA wc;
 		wc.cbSize = sizeof(WNDCLASSEXA);
 		GetClassInfoExA(GetModuleHandle(NULL), f->title, &wc);
 		wc.hCursor = cursors[t];
@@ -939,10 +953,13 @@ FENSTER_API void fenster_resize(struct fenster* f, const int width, const int he
 #ifndef FENSTER_WIN
 
 FENSTER_API void fenster_sleep(const int64_t ms) {
+	usleep(ms * 1000);
+/*
 	struct timespec ts;
 	ts.tv_sec = ms / 1000;
 	ts.tv_nsec = (ms % 1000) * 1000000;
 	nanosleep(&ts, NULL);
+*/
 }
 
 FENSTER_API int64_t fenster_time(void) {
