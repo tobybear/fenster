@@ -358,12 +358,11 @@ static boolean already_quitting = false;
 
 void I_Error (char *error, ...)
 {
-return;
     char msgbuf[512];
     va_list argptr;
     atexit_listentry_t *entry;
     boolean exit_gui_popup;
-
+/*
     if (already_quitting)
     {
         fprintf(stderr, "Warning: recursive call to I_Error detected.\n");
@@ -375,7 +374,7 @@ return;
     {
         already_quitting = true;
     }
-
+*/
     // Message first.
     va_start(argptr, error);
     //fprintf(stderr, "\nError: ");
@@ -384,6 +383,7 @@ return;
     va_end(argptr);
     fflush(stderr);
 
+return;
     // Write a copy of the message into buffer.
     va_start(argptr, error);
     memset(msgbuf, 0, sizeof(msgbuf));

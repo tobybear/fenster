@@ -2,6 +2,10 @@
 #include "../fenster.h"
 #include "../sharedmem.h"
 
+#ifndef _WIN32
+#define strcpy_s(a, b, c) strcpy((a), (c));
+#endif
+
 int main(int argc, char** argv) {
 	struct fenster f = { 0 };
 	int64_t now, time;
@@ -23,6 +27,7 @@ int main(int argc, char** argv) {
 	int fs = 0;
 
 	pMem = (uint8_t*)createSharedMem(mapfile1, size1, 0, &hdl1);
+	if (!pMem) { printf("Err -> exit\n"); return 1; }
 	pHdr = (struct hdr*)pMem;
 	sync = &pHdr->sync;
 	W = pHdr->w;
@@ -37,6 +42,7 @@ int main(int argc, char** argv) {
 	f.width = W;
 	f.height = H;
 	f.buf = pPixBuf;
+	f.allow_resize = 1;
 	fenster_open(&f);
 	now = fenster_time();
 	while (fenster_loop(&f) == 0) {
@@ -44,8 +50,8 @@ int main(int argc, char** argv) {
 		if (*sync == 3) {
 			int m = pHdr->win_w * pHdr->win_h;
 			if (m > 0) {
-				fs = 1 - fs;
 				if (m == 1) {
+					fs = 1 - fs;
 					fenster_fullscreen(&f, fs);
 				} else {
 					fenster_resize(&f, pHdr->win_w, pHdr->win_h);

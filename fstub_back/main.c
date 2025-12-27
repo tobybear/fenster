@@ -72,31 +72,31 @@ int main(int argc, char** argv) {
 
 		for (i = 32; i < 128; i++) {
 			if (inp->key_down[i]) {
-				has_keys = 1;
+				has_keys = i;
 				*p++ = i;
 			}
 		}
 		*p = '\0';
 		fenster_text(pPixBuf, W, 50, 50, s, 2, 0xff00ffff);
-		if (strlen(s) > 0) printf("%s\n", s);
+//		if (strlen(s) > 0) printf("%d %s %d %d %d %d\n", has_keys, s, inp->key_mod[0], inp->key_mod[1], inp->key_mod[2], inp->key_mod[3]);
 		if (inp->key[27]) { 
 			break; 
 		}
 		*sync =	0;
-		if (inp->key_mod[0]) {
-			if (inp->key['1']) { 
+		if (inp->key_mod[0] > 0) {
+			if (inp->key_down['1']) { 
 				pHdr->win_w = W;
 				pHdr->win_h = H;
 				*sync = 3;
-			} else if (inp->key['2']) { 
+			} else if (inp->key_down['2']) { 
 				pHdr->win_w = W * 2;
 				pHdr->win_h = H * 2;
 				*sync = 3;
-			} else if (inp->key['3']) { 
+			} else if (inp->key_down['3']) { 
 				pHdr->win_w = W * 4;
 				pHdr->win_h = H * 4;
 				*sync = 3;
-			} else if (inp->key['4']) { 
+			} else if (inp->key_down['4']) { 
 				pHdr->win_w = 1;
 				pHdr->win_h = 1;
 				*sync = 3;

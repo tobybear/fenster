@@ -34,6 +34,7 @@ static void usleep(__int64 usec) {
 #endif
 #include <time.h>
 #include <string.h>
+#include <unistd.h>
 #endif
 
 #include <stdint.h>
@@ -133,6 +134,7 @@ static int current_cursor_type = 1;
 static void fenster_window_resize(id v, SEL s, id note) {
 	(void)s;
 	struct fenster* f = (struct fenster *)objc_getAssociatedObject(v, "fenster");
+	if (f->allow_resize == 0) return;
 	CGRect frame = msg(CGRect, msg(id, note, "object"), "frame");
 	f->win_width = frame.size.width;
 	f->win_height = frame.size.height;
@@ -373,6 +375,7 @@ FENSTER_API void fenster_cursor(struct fenster* f, const int type) {
 #endif // FENSTER_CURSOR
 
 FENSTER_API void fenster_resize(struct fenster* f, const int width, const int height) {
+	if (f->allow_resize == 0) return;
 	CGRect newFrame = CGRectMake(0, 0, width, height);
 	msg2(void, f->wnd, "setFrame:display:", CGRect, newFrame, BOOL, YES);
 	msg(void, f->wnd, "center");
@@ -681,6 +684,7 @@ FENSTER_API void fenster_cursor(struct fenster* f, const int type) {
 #endif // FENSTER_CURSOR
 
 FENSTER_API void fenster_resize(struct fenster* f, const int width, const int height) {
+	if (f->allow_resize == 0) return;
 	RECT rect = { 0, 0, width, height };
 	int win_style = f->allow_resize ? WS_OVERLAPPEDWINDOW : WS_NORESIZE;
 	AdjustWindowRectEx(&rect, win_style, FALSE, 0);
@@ -944,6 +948,7 @@ FENSTER_API void fenster_cursor(struct fenster* f, const int type) {
 #endif // FENSTER_CURSOR
 
 FENSTER_API void fenster_resize(struct fenster* f, const int width, const int height) {
+	if (f->allow_resize == 0) return;
 	XResizeWindow(f->dpy, f->w, width, height);
 	XFlush(f->dpy);
 }

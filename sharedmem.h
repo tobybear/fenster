@@ -55,36 +55,31 @@ void destroySharedMem(void* pMem, void** handle) {
 #else
 void* createSharedMem(const char* name, const uint32_t size, const uint8_t reset, void** handle) {
 	*handle = NULL;
-	int fd = open(FILEPATH, O_RDWR | O_CREAT | (reset > 0 ? O_TRUNC : 0 ), (mode_t)0600);
+	int fd = open(name, O_RDWR | O_CREAT | (reset > 0 ? O_TRUNC : 0 ), (mode_t)0600);
 	if (fd == -1) {
-		//perror("Error opening file for reading");
+		perror("Error opening file");
 		return NULL;
 	}
-	*handle = (void*)size;
+	*handle = (void*)(uintptr_t)size;
 	int result = lseek(fd, size - 1, SEEK_SET);
 	if (result == -1) {
 		close(fd);
-		//perror("Error calling lseek() to 'stretch' the file");
+		perror("Error calling lseek() to 'stretch' the file");
 		return NULL;
 	}
 	if (reset > 0) result = write(fd, "", 1);
-	if (result != 1) {
-		close(fd);
-		//perror("Error writing last byte of the file");
-		return NULL;
-	}
 
 	void* pMem = mmap(0, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
 	if (pMem == MAP_FAILED) {
 		close(fd);
-		//perror("Error mmapping the file");
+		perror("Error mmapping the file");
 		return NULL;
 	}
+	close(fd);
 	return pMem;
 }
 
 void destroySharedMem(void* pMem, void** handle) {
-	munmap(pMem, (uint32_t)(*handle));
-	close(fd);
+	munmap(pMem, (uint32_t)(uintptr_t)(*handle));
 }
 #endif
